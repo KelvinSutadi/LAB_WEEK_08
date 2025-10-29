@@ -17,6 +17,7 @@ import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
 import com.example.lab_week_08.worker.FirstWorker
 import com.example.lab_week_08.worker.SecondWorker
+import com.example.lab_week_08.worker.ThirdWorker
 
 class MainActivity: AppCompatActivity() {
     private val workManager =
@@ -45,19 +46,22 @@ class MainActivity: AppCompatActivity() {
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
 
-        val id = "001"
         val firstRequest = OneTimeWorkRequest
             .Builder(FirstWorker::class.java)
             .setConstraints(networkConstraints)
-            .setInputData(getIdInputData(FirstWorker
-                .INPUT_DATA_ID, id))
+            .setInputData(getIdInputData(FirstWorker.INPUT_DATA_ID, "001"))
             .build()
 
         val secondRequest = OneTimeWorkRequest
             .Builder(SecondWorker::class.java)
             .setConstraints(networkConstraints)
-            .setInputData(getIdInputData(SecondWorker
-                .INPUT_DATA_ID, id))
+            .setInputData(getIdInputData(SecondWorker.INPUT_DATA_ID, "001"))
+            .build()
+
+        val thirdRequest = OneTimeWorkRequest
+            .Builder(ThirdWorker::class.java)
+            .setConstraints(networkConstraints)
+            .setInputData(getIdInputData(ThirdWorker.INPUT_DATA_ID, "002"))
             .build()
 
         workManager.beginWith(firstRequest)
@@ -78,6 +82,27 @@ class MainActivity: AppCompatActivity() {
                     launchNotificationService()
                 }
             }
+
+        NotificationService.trackingCompletion.observe(this) { Id ->
+            if (Id != null) {
+                showResult("Process for Notification Channel ID $Id is done!")
+                workManager.enqueue(thirdRequest)
+            }
+        }
+
+        workManager.getWorkInfoByIdLiveData(thirdRequest.id)
+            .observe(this) { info ->
+                if (info != null && info.state.isFinished) {
+                    showResult("Third process is done")
+                    launchSecondNotificationService()
+                }
+            }
+
+        SecondNotificationService.trackingCompletion.observe(this) { Id ->
+            if (Id != null) {
+                showResult("Process for Notification Channel ID $Id is done!")
+            }
+        }
     }
 
     private fun getIdInputData(idKey: String, idValue: String) =
@@ -90,20 +115,18 @@ class MainActivity: AppCompatActivity() {
     }
 
     private fun launchNotificationService() {
-        NotificationService.trackingCompletion.observe(
-            this) { Id ->
-            if (Id != null) {
-                showResult("Process for Notification Channel ID $Id is done!")
-            }
-        }
         val serviceIntent = Intent(this,
             NotificationService::class.java).apply {
-            putExtra(EXTRA_ID, "001")
+            putExtra(NotificationService.EXTRA_ID, "001")
         }
         ContextCompat.startForegroundService(this, serviceIntent)
     }
 
-    companion object{
-        const val EXTRA_ID = "Id"
+    private fun launchSecondNotificationService() {
+        val serviceIntent = Intent(this,
+            SecondNotificationService::class.java).apply {
+            putExtra(SecondNotificationService.EXTRA_ID, "002")
+        }
+        ContextCompat.startForegroundService(this, serviceIntent)
     }
 }
